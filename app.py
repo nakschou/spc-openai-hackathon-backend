@@ -12,6 +12,7 @@ dspy.configure(lm=turbo)
 @app.route('/question_replies', methods=['GET'])
 def question_replies():
     text = request.args.get('text', 'What is the meaning of life?')  # Default to 'World' if 'name' not provided
+    print(text)
     class Question_Three_Replies(dspy.Signature):
         """Given a tweet with a question, generate three possible unique replies"""
 
@@ -22,6 +23,7 @@ def question_replies():
     q_3 = dspy.Predict(Question_Three_Replies)
     try:
         answer = q_3(question=text)
+        print(answer)
         return jsonify(answer.toDict(), status=200)
     except Exception as e:
         return jsonify({'error': str(e)}, status=500)
