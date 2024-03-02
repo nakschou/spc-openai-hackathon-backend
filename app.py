@@ -5,12 +5,14 @@ from dotenv import load_dotenv
 from openai import OpenAI
 import requests
 import urllib.parse
+import yfinance as yf
 
 app = Flask(__name__)
 client = OpenAI()
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 MAPBOX_API_KEY = os.getenv("MAPBOX_API_KEY")
+OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
 turbo = dspy.OpenAI(model='gpt-4', api_key=OPENAI_API_KEY)
 dspy.configure(lm=turbo)
 
@@ -181,7 +183,7 @@ def text_to_coords():
             "access_token": MAPBOX_API_KEY,
         }
         response = requests.get(url, params=params)
-        lat, lon = response.json()["features"][0]["center"]
+        lon, lat = response.json()["features"][0]["center"]
         response = app.response_class(
             response=json.dumps({'latitude': lat, 'longitude': lon}),
             status=200,
@@ -195,3 +197,114 @@ def text_to_coords():
             mimetype='application/json'
         )
         return response
+    
+@app.route('/text_to_weather', methods=['GET'])
+def text_to_weather():
+    text = request.args.get('text', 'None')
+    class Address_Finder(dspy.Signature):
+        """Given a tweet, derive an address or location from the tweet that could be geocoded"""
+
+        tweet = dspy.InputField()
+        location = dspy.OutputField(desc="Address or location, or 'None' if no location found.")
+    add = dspy.Predict(Address_Finder)
+    try:
+        answer = add(tweet=text)
+    except Exception as e:
+        response = app.response_class(
+            response=json.dumps({'error': "Error in deriving location from text"}),
+            status=500,
+            mimetype='application/json'
+        )
+        return response
+    try:
+        encoded_location = urllib.parse.quote(answer.location, safe='')
+        url = f"https://api.mapbox.com/geocoding/v5/mapbox.places/{encoded_location}.json"
+        params = {
+            "access_token": MAPBOX_API_KEY,
+        }
+        response = requests.get(url, params=params)
+        lon, lat = response.json()["features"][0]["center"]
+    except Exception as e:
+        response = app.response_class(
+            response=json.dumps({'error': "Error in converting text to coordinates"}),
+            status=500,
+            mimetype='application/json'
+        )
+        return response
+    try:
+        url = f"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={OPENWEATHER_API_KEY}&units=imperial"
+        response = requests.get(url)
+        weather = response.json()
+        returnjson = {
+            "location": weather["name"],
+            "description": weather["weather"][0]["description"],
+            "temperature": weather["main"]["temp"],
+            "feels_like": weather["main"]["feels_like"],
+            "humidity": weather["main"]["humidity"],
+            "wind_speed": weather["wind"]["speed"],
+            "wind_direction": weather["wind"]["deg"],
+        }
+        response = app.response_class(
+            response=json.dumps(returnjson),
+            status=200,
+            mimetype='application/json'
+        )
+        return response
+    except Exception as e:
+        response = app.response_class(
+            response=json.dumps({'error': "Error in fetching weather data"}),
+            status=500,
+            mimetype='application/json'
+        )
+        return response
+
+@app.route('/text_to_finance_data', methods=['GET'])
+def text_to_finance_data():
+    text = request.args.get('text', 'None')
+    class Ticker_Finder(dspy.Signature):
+        """Given a tweet, derive a stock ticker from the tweet"""
+
+        tweet = dspy.InputField()
+        ticker = dspy.OutputField(desc="Ticker such as 'AAPL' or 'GOOGL', or 'None' if no ticker found.")
+    tck = dspy.Predict(Ticker_Finder)
+    try:
+        answer = tck(tweet=text)
+    except Exception as e:
+        response = app.response_class(
+            response=json.dumps({'error': "Error in deriving ticker from text"}),
+            status=500,
+            mimetype='application/json'
+        )
+        return response
+    if answer.ticker == "None":
+        response = app.response_class(
+            response=json.dumps({'error': "No ticker found"}),
+            status=500,
+            mimetype='application/json'
+        )
+        return response
+    try:
+        data = yf.download(answer.ticker, period="1mo")
+    except Exception as e:
+        response = app.response_class(
+            response=json.dumps({'error': "Error in fetching finance data"}),
+            status=500,
+            mimetype='application/json'
+        )
+        return response
+    percent_today = (data["Close"][-1] - data["Open"][-1]) / data["Open"][-1] * 100
+    current_price = data["Close"][-1]
+    close_prices = data["Close"].to_dict()
+    close_prices = {timestamp.to_pydatetime().isoformat() + 'Z': price for timestamp, price in close_prices.items()}
+    returnjson = {
+        "ticker": answer.ticker,
+        "percent_today": percent_today,
+        "current_price": current_price,
+        "close_prices": close_prices,
+    }
+    response = app.response_class(
+        response=json.dumps(returnjson),
+        status=200,
+        mimetype='application/json'
+    )
+    return response
