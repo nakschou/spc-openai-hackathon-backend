@@ -3,11 +3,14 @@ import dspy
 import os
 from dotenv import load_dotenv
 from openai import OpenAI
+import requests
+import urllib.parse
 
 app = Flask(__name__)
 client = OpenAI()
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+MAPBOX_API_KEY = os.getenv("MAPBOX_API_KEY")
 turbo = dspy.OpenAI(model='gpt-4', api_key=OPENAI_API_KEY)
 dspy.configure(lm=turbo)
 
@@ -141,6 +144,53 @@ def text_to_image():
     except Exception as e:
         response = app.response_class(
             response=json.dumps({'error': "Error in converting text to image"}),
+            status=500,
+            mimetype='application/json'
+        )
+        return response
+    
+@app.route('/text_to_coords', methods=['GET'])
+def text_to_coords():
+    text = request.args.get('text', 'None')
+    if text == 'None':
+        response = app.response_class(
+            response=json.dumps({'error': "No text provided"}),
+            status=500,
+            mimetype='application/json'
+        )
+        return response
+    class Address_Finder(dspy.Signature):
+        """Given a tweet, derive an address or location from the tweet that could be geocoded"""
+
+        tweet = dspy.InputField()
+        location = dspy.OutputField(desc="Address or location, or 'None' if no location found.")
+    try:
+        add = dspy.Predict(Address_Finder)
+    except Exception as e:
+        response = app.response_class(
+            response=json.dumps({'error': "Error in deriving location from text"}),
+            status=500,
+            mimetype='application/json'
+        )
+        return response
+    answer = add(tweet=text)
+    try:
+        encoded_location = urllib.parse.quote(answer.location, safe='')
+        url = f"https://api.mapbox.com/geocoding/v5/mapbox.places/{encoded_location}.json"
+        params = {
+            "access_token": MAPBOX_API_KEY,
+        }
+        response = requests.get(url, params=params)
+        lat, lon = response.json()["features"][0]["center"]
+        response = app.response_class(
+            response=json.dumps({'latitude': lat, 'longitude': lon}),
+            status=200,
+            mimetype='application/json'
+        )
+        return response
+    except Exception as e:
+        response = app.response_class(
+            response=json.dumps({'error': "Error in converting text to coordinates"}),
             status=500,
             mimetype='application/json'
         )
