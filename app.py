@@ -107,3 +107,36 @@ def filter_image():
             mimetype='application/json'
         )
         return response
+
+@app.route('/text_to_image', methods=['GET'])
+def text_to_image():
+    text = request.args.get('text', 'None')
+    if text == 'None':
+        response = app.response_class(
+            response=json.dumps({'error': "No text provided"}),
+            status=500,
+            mimetype='application/json'
+        )
+        return response
+    try:
+        response = client.images.generate(
+            model="dall-e-3",
+            prompt="Given the following tweet text, generate an image that represents it: " + text,
+            size="1024x1024",
+            quality="standard",
+            n=1,
+        )
+        url = response.dict()["data"][0]["url"]
+        response = app.response_class(
+            response=json.dumps({'url': url}),
+            status=200,
+            mimetype='application/json'
+        )
+        return response
+    except Exception as e:
+        response = app.response_class(
+            response=json.dumps({'error': "Error in converting text to image"}),
+            status=500,
+            mimetype='application/json'
+        )
+        return response
