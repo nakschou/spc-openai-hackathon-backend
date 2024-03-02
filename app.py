@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 import requests
 import urllib.parse
+import yfinance as yf
 
 app = Flask(__name__)
 client = OpenAI()
@@ -256,3 +257,54 @@ def text_to_weather():
             mimetype='application/json'
         )
         return response
+
+@app.route('/text_to_finance_data', methods=['GET'])
+def text_to_finance_data():
+    text = request.args.get('text', 'None')
+    class Ticker_Finder(dspy.Signature):
+        """Given a tweet, derive a stock ticker from the tweet"""
+
+        tweet = dspy.InputField()
+        ticker = dspy.OutputField(desc="Ticker such as 'AAPL' or 'GOOGL', or 'None' if no ticker found.")
+    tck = dspy.Predict(Ticker_Finder)
+    try:
+        answer = tck(tweet=text)
+    except Exception as e:
+        response = app.response_class(
+            response=json.dumps({'error': "Error in deriving ticker from text"}),
+            status=500,
+            mimetype='application/json'
+        )
+        return response
+    if answer.ticker == "None":
+        response = app.response_class(
+            response=json.dumps({'error': "No ticker found"}),
+            status=500,
+            mimetype='application/json'
+        )
+        return response
+    try:
+        data = yf.download(answer.ticker, period="1mo")
+    except Exception as e:
+        response = app.response_class(
+            response=json.dumps({'error': "Error in fetching finance data"}),
+            status=500,
+            mimetype='application/json'
+        )
+        return response
+    percent_today = (data["Close"][-1] - data["Open"][-1]) / data["Open"][-1] * 100
+    current_price = data["Close"][-1]
+    close_prices = data["Close"].to_dict()
+    close_prices = {timestamp.to_pydatetime().isoformat() + 'Z': price for timestamp, price in close_prices.items()}
+    returnjson = {
+        "ticker": answer.ticker,
+        "percent_today": percent_today,
+        "current_price": current_price,
+        "close_prices": close_prices,
+    }
+    response = app.response_class(
+        response=json.dumps(returnjson),
+        status=200,
+        mimetype='application/json'
+    )
+    return response
