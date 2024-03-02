@@ -40,9 +40,23 @@ def question_replies():
         return response
     
 @app.route('/filter_image', methods=['GET'])
-def filter_image(image_url, new_filter):
+def filter_image():
     image_url = request.args.get('image_url', 'None')
     new_filter = request.args.get('new_filter', 'None')
+    if new_filter == 'None':
+        response = app.response_class(
+            response=json.dumps({'url': image_url}),
+            status=200,
+            mimetype='application/json'
+        )
+        return response
+    if image_url == 'None':
+        response = app.response_class(
+            response=json.dumps({'error': "No image URL provided"}),
+            status=500,
+            mimetype='application/json'
+        )
+        return response
     try:
         response = client.chat.completions.create(
         model="gpt-4-vision-preview",
@@ -85,7 +99,6 @@ def filter_image(image_url, new_filter):
             status=200,
             mimetype='application/json'
         )
-        print(url)
         return response
     except Exception as e:
         response = app.response_class(
