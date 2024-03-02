@@ -19,9 +19,9 @@ def question_replies():
         reply1 = dspy.OutputField(desc="1-5 words")
         reply2 = dspy.OutputField(desc="1-5 words")
         reply3 = dspy.OutputField(desc="1-5 words")
-    q_3 = dspy.ChainOfThought(Question_Three_Replies)
+    q_3 = dspy.Predict(Question_Three_Replies)
     try:
         answer = q_3(question=text)
+        return jsonify(answer.toDict(), status=200)
     except Exception as e:
         return jsonify({'error': str(e)}, status=500)
-    return jsonify(answer.toDict(), status=200)
