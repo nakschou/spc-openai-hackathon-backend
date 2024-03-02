@@ -11,6 +11,7 @@ client = OpenAI()
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 MAPBOX_API_KEY = os.getenv("MAPBOX_API_KEY")
+OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
 turbo = dspy.OpenAI(model='gpt-4', api_key=OPENAI_API_KEY)
 dspy.configure(lm=turbo)
 
@@ -181,7 +182,7 @@ def text_to_coords():
             "access_token": MAPBOX_API_KEY,
         }
         response = requests.get(url, params=params)
-        lat, lon = response.json()["features"][0]["center"]
+        lon, lat = response.json()["features"][0]["center"]
         response = app.response_class(
             response=json.dumps({'latitude': lat, 'longitude': lon}),
             status=200,
@@ -191,6 +192,57 @@ def text_to_coords():
     except Exception as e:
         response = app.response_class(
             response=json.dumps({'error': "Error in converting text to coordinates"}),
+            status=500,
+            mimetype='application/json'
+        )
+        return response
+    
+@app.route('/text_to_weather', methods=['GET'])
+def text_to_weather():
+    text = request.args.get('text', 'None')
+    class Address_Finder(dspy.Signature):
+        """Given a tweet, derive an address or location from the tweet that could be geocoded"""
+
+        tweet = dspy.InputField()
+        location = dspy.OutputField(desc="Address or location, or 'None' if no location found.")
+    add = dspy.Predict(Address_Finder)
+    try:
+        answer = add(tweet=text)
+    except Exception as e:
+        response = app.response_class(
+            response=json.dumps({'error': "Error in deriving location from text"}),
+            status=500,
+            mimetype='application/json'
+        )
+        return response
+    try:
+        encoded_location = urllib.parse.quote(answer.location, safe='')
+        url = f"https://api.mapbox.com/geocoding/v5/mapbox.places/{encoded_location}.json"
+        params = {
+            "access_token": MAPBOX_API_KEY,
+        }
+        response = requests.get(url, params=params)
+        lon, lat = response.json()["features"][0]["center"]
+    except Exception as e:
+        response = app.response_class(
+            response=json.dumps({'error': "Error in converting text to coordinates"}),
+            status=500,
+            mimetype='application/json'
+        )
+        return response
+    try:
+        url = f"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={OPENWEATHER_API_KEY}&units=imperial"
+        response = requests.get(url)
+        weather = response.json()
+        response = app.response_class(
+            response=json.dumps(weather),
+            status=200,
+            mimetype='application/json'
+        )
+        return response
+    except Exception as e:
+        response = app.response_class(
+            response=json.dumps({'error': "Error in fetching weather data"}),
             status=500,
             mimetype='application/json'
         )
