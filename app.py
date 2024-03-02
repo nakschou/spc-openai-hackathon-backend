@@ -294,11 +294,13 @@ def text_to_finance_data():
         return response
     percent_today = (data["Close"][-1] - data["Open"][-1]) / data["Open"][-1] * 100
     current_price = data["Close"][-1]
+    amount_today = data["Close"][-1] - data["Open"][-1]
     close_prices = data["Close"].to_dict()
     close_prices = {timestamp.to_pydatetime().isoformat() + 'Z': price for timestamp, price in close_prices.items()}
     returnjson = {
         "ticker": answer.ticker,
         "percent_today": percent_today,
+        "amount_today": amount_today,
         "current_price": current_price,
         "close_prices": close_prices,
     }
