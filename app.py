@@ -85,6 +85,7 @@ def filter_image(image_url, new_filter):
             status=200,
             mimetype='application/json'
         )
+        print(url)
         return response
     except Exception as e:
         response = app.response_class(
