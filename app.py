@@ -111,6 +111,7 @@ def filter_image():
 @app.route('/text_to_image', methods=['GET'])
 def text_to_image():
     text = request.args.get('text', 'None')
+    new_filter = request.args.get('new_filter', 'None')
     if text == 'None':
         response = app.response_class(
             response=json.dumps({'error': "No text provided"}),
@@ -119,9 +120,13 @@ def text_to_image():
         )
         return response
     try:
+        if new_filter == "None":
+            prompt = "Convert the following text prompt to an image: " + text
+        else:
+            prompt = f"Reimagine the following text prompt if it were filtered like {new_filter}: {text}"
         response = client.images.generate(
             model="dall-e-3",
-            prompt="Given the following tweet text, generate an image that represents it: " + text,
+            prompt=prompt,
             size="1024x1024",
             quality="standard",
             n=1,
