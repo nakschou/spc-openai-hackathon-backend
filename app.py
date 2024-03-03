@@ -32,9 +32,9 @@ def question_replies():
 
         question = dspy.InputField()
         adjective = dspy.InputField(desc="Adjective to describe the replies")
-        reply1 = dspy.OutputField()
-        reply2 = dspy.OutputField()
-        reply3 = dspy.OutputField()
+        reply1 = dspy.OutputField(desc="1-5 words")
+        reply2 = dspy.OutputField(desc="1-5 words")
+        reply3 = dspy.OutputField(desc="1-5 words")
     q_3 = dspy.Predict(Question_Three_Replies)
     try:
         answer = q_3(question=text, adjective=adjective)
