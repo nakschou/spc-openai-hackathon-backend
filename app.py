@@ -11,6 +11,7 @@ from PIL import Image
 from io import BytesIO
 import base64
 import redis
+from pinecone import Pinecone
 
 app = Flask(__name__)
 client = OpenAI()
