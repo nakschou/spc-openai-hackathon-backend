@@ -215,25 +215,9 @@ def text_to_coords():
     
 @app.route('/text_to_weather', methods=['GET'])
 def text_to_weather():
-    text = request.args.get('text', 'None')
-    class Address_Finder(dspy.Signature):
-        """Given a tweet, derive an address or location from the tweet that could be geocoded"""
-
-        tweet = dspy.InputField()
-        location = dspy.OutputField(desc="Address or location, or 'None' if no location found.")
-    add = dspy.Predict(Address_Finder)
+    location = request.args.get('location', 'None')
     try:
-        answer = add(tweet=text)
-    except Exception as e:
-        response = app.response_class(
-            response=json.dumps({'error': "Error in deriving location from text"}),
-            status=500,
-            mimetype='application/json'
-        )
-        response.headers.add('Access-Control-Allow-Origin', '*')
-        return response
-    try:
-        encoded_location = urllib.parse.quote(answer.location, safe='')
+        encoded_location = urllib.parse.quote(location, safe='')
         url = f"https://api.mapbox.com/geocoding/v5/mapbox.places/{encoded_location}.json"
         params = {
             "access_token": MAPBOX_API_KEY,
