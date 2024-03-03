@@ -36,6 +36,7 @@ def question_replies():
             status=200,
             mimetype='application/json'
         )
+        response.headers.add('Access-Control-Allow-Origin', '*')
         return response
     except Exception as e:
         response = app.response_class(
@@ -43,6 +44,7 @@ def question_replies():
             status=500,
             mimetype='application/json'
         )
+        response.headers.add('Access-Control-Allow-Origin', '*')
         return response
     
 @app.route('/filter_image', methods=['GET'])
@@ -129,6 +131,7 @@ def text_to_image():
             status=500,
             mimetype='application/json'
         )
+        response.headers.add('Access-Control-Allow-Origin', '*')
         return response
     try:
         if new_filter == "None":
@@ -148,6 +151,7 @@ def text_to_image():
             status=200,
             mimetype='application/json'
         )
+        response.headers.add('Access-Control-Allow-Origin', '*')
         return response
     except Exception as e:
         response = app.response_class(
@@ -155,6 +159,7 @@ def text_to_image():
             status=500,
             mimetype='application/json'
         )
+        response.headers.add('Access-Control-Allow-Origin', '*')
         return response
     
 @app.route('/text_to_coords', methods=['GET'])
@@ -166,6 +171,7 @@ def text_to_coords():
             status=500,
             mimetype='application/json'
         )
+        response.headers.add('Access-Control-Allow-Origin', '*')
         return response
     class Address_Finder(dspy.Signature):
         """Given a tweet, derive an address or location from the tweet that could be geocoded"""
@@ -180,6 +186,7 @@ def text_to_coords():
             status=500,
             mimetype='application/json'
         )
+        response.headers.add('Access-Control-Allow-Origin', '*')
         return response
     answer = add(tweet=text)
     try:
@@ -195,6 +202,7 @@ def text_to_coords():
             status=200,
             mimetype='application/json'
         )
+        response.headers.add('Access-Control-Allow-Origin', '*')
         return response
     except Exception as e:
         response = app.response_class(
@@ -202,6 +210,7 @@ def text_to_coords():
             status=500,
             mimetype='application/json'
         )
+        response.headers.add('Access-Control-Allow-Origin', '*')
         return response
     
 @app.route('/text_to_weather', methods=['GET'])
@@ -221,6 +230,7 @@ def text_to_weather():
             status=500,
             mimetype='application/json'
         )
+        response.headers.add('Access-Control-Allow-Origin', '*')
         return response
     try:
         encoded_location = urllib.parse.quote(answer.location, safe='')
@@ -236,6 +246,7 @@ def text_to_weather():
             status=500,
             mimetype='application/json'
         )
+        response.headers.add('Access-Control-Allow-Origin', '*')
         return response
     try:
         url = f"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={OPENWEATHER_API_KEY}&units=imperial"
@@ -256,6 +267,7 @@ def text_to_weather():
             status=200,
             mimetype='application/json'
         )
+        response.headers.add('Access-Control-Allow-Origin', '*')
         return response
     except Exception as e:
         response = app.response_class(
@@ -263,6 +275,7 @@ def text_to_weather():
             status=500,
             mimetype='application/json'
         )
+        response.headers.add('Access-Control-Allow-Origin', '*')
         return response
 
 @app.route('/text_to_finance_data', methods=['GET'])
@@ -282,6 +295,7 @@ def text_to_finance_data():
             status=500,
             mimetype='application/json'
         )
+        response.headers.add('Access-Control-Allow-Origin', '*')
         return response
     if answer.ticker == "None":
         response = app.response_class(
@@ -289,6 +303,7 @@ def text_to_finance_data():
             status=500,
             mimetype='application/json'
         )
+        response.headers.add('Access-Control-Allow-Origin', '*')
         return response
     try:
         data = yf.download(answer.ticker, period="1mo")
@@ -298,6 +313,7 @@ def text_to_finance_data():
             status=500,
             mimetype='application/json'
         )
+        response.headers.add('Access-Control-Allow-Origin', '*')
         return response
     percent_today = (data["Close"][-1] - data["Open"][-1]) / data["Open"][-1] * 100
     current_price = data["Close"][-1]
@@ -322,6 +338,7 @@ def text_to_finance_data():
         status=200,
         mimetype='application/json'
     )
+    response.headers.add('Access-Control-Allow-Origin', '*')
     return response
 
 @app.route('/text_to_politics', methods=['GET'])
@@ -381,5 +398,10 @@ def text_to_politics():
     party_output = dspy.Predict(classify_party)
     party = party_output(text=text).toDict()['party']
     
-    
-    return {"party": party, "articles": articles}
+    response = app.response_class(
+        response=json.dumps({"party": party, "articles": articles}),
+        status=200,
+        mimetype='application/json'
+    )
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    return response
