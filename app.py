@@ -130,7 +130,6 @@ def filter_image():
             n=1,
         )
         url = response.dict()["data"][0]["url"]
-        r.set(image_url+new_filter, url)
         # Step 1: Download the image
         response = requests.get(url)
         response.raise_for_status()  # This will raise an HTTPError if the request returned an unsuccessful status code.
@@ -141,6 +140,7 @@ def filter_image():
         image.save(compressed_image_io, format='JPEG', quality=20)
         compressed_image_io.seek(0)  # Rewind the file-like object to its beginning
         image_base64 = base64.b64encode(compressed_image_io.read()).decode('utf-8')
+        r.set(image_url+new_filter, image_base64)
         response = app.response_class(
             response=json.dumps({'image': image_base64}),
             status=200,
