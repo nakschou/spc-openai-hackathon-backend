@@ -95,9 +95,9 @@ def question_replies():
         try:
             cn_ret = cn(tweet=text, explanation = response.json()["choices"][0]["message"]["content"])
             response = app.response_class(
-                response=json.dumps({'reply1': answer.reply1, 
-                                        'reply2': answer.reply2,
-                                        'reply3': answer.reply3,
+                response=json.dumps({'reply1': answer["reply1"], 
+                                    'reply2': answer["reply2"],
+                                    'reply3': answer["reply3"],
                                     'community_note': cn_ret.correction}),
                 status=200,
                 mimetype='application/json'
@@ -114,9 +114,9 @@ def question_replies():
             return response
     else:
         response = app.response_class(
-            response=json.dumps({'reply1': answer.reply1, 
-                                    'reply2': answer.reply2,
-                                    'reply3': answer.reply3,
+            response=json.dumps({'reply1': answer["reply1"], 
+                                'reply2': answer["reply2"],
+                                'reply3': answer["reply3"],
                                     'community_note': "None"}),
             status=200,
             mimetype='application/json'
