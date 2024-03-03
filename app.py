@@ -412,31 +412,40 @@ def text_to_finance_data():
         )
         response.headers.add('Access-Control-Allow-Origin', '*')
         return response
-    percent_today = (data["Close"][-1] - data["Open"][-1]) / data["Open"][-1] * 100
-    current_price = data["Close"][-1]
-    amount_today = data["Close"][-1] - data["Open"][-1]
-    close_prices = data["Close"].to_dict()
-    high = data["High"][-1]
-    low = data["Low"][-1]
-    volume = data["Volume"][-1]
-    close_prices = {timestamp.to_pydatetime().isoformat() + 'Z': price for timestamp, price in close_prices.items()}
-    returnjson = {
-        "ticker": ticker,
-        "percent_today": percent_today,
-        "amount_today": amount_today,
-        "current_price": current_price,
-        "close_prices": close_prices,
-        "high": high,
-        "low": low,
-        "volume": volume,
-    }
-    response = app.response_class(
-        response=json.dumps(returnjson),
-        status=200,
-        mimetype='application/json'
-    )
-    response.headers.add('Access-Control-Allow-Origin', '*')
-    return response
+    try:
+        percent_today = (data["Close"][-1] - data["Open"][-1]) / data["Open"][-1] * 100
+        current_price = data["Close"][-1]
+        amount_today = data["Close"][-1] - data["Open"][-1]
+        close_prices = data["Close"].to_dict()
+        high = data["High"][-1]
+        low = data["Low"][-1]
+        volume = data["Volume"][-1]
+        close_prices = {timestamp.to_pydatetime().isoformat() + 'Z': price for timestamp, price in close_prices.items()}
+        returnjson = {
+            "ticker": ticker,
+            "percent_today": percent_today,
+            "amount_today": amount_today,
+            "current_price": current_price,
+            "close_prices": close_prices,
+            "high": high,
+            "low": low,
+            "volume": volume,
+        }
+        response = app.response_class(
+            response=json.dumps(returnjson),
+            status=200,
+            mimetype='application/json'
+        )
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        return response
+    except Exception as e:
+        response = app.response_class(
+            response=json.dumps({'error': str(e)}),
+            status=500,
+            mimetype='application/json'
+        )
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        return response
 
 @app.route('/text_to_politics', methods=['GET'])
 def text_to_politics():
