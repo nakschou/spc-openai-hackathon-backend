@@ -13,6 +13,7 @@ load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 MAPBOX_API_KEY = os.getenv("MAPBOX_API_KEY")
 OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 turbo = dspy.OpenAI(model='gpt-4', api_key=OPENAI_API_KEY)
 dspy.configure(lm=turbo)
 
