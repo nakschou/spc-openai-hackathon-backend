@@ -319,15 +319,15 @@ def text_to_finance_data():
         high = data["High"][-1]
         low = data["Low"][-1]
         volume = data["Volume"][-1]
-        close_prices = {timestamp.to_pydatetime().isoformat() + 'Z': price for timestamp, price in close_prices.items()}
+        close_prices = {timestamp.to_pydatetime().isoformat() + 'Z': float(price) for timestamp, price in close_prices.items()}
         returnjson = {
-            "ticker": ticker,
-            "percent_today": percent_today,
-            "amount_today": amount_today,
-            "current_price": current_price,
+            "ticker": str(ticker),
+            "percent_today": float(percent_today),
+            "amount_today": float(amount_today),
+            "current_price": float(current_price),
             "close_prices": close_prices,
-            "high": high,
-            "low": low,
+            "high": float(high),
+            "low": float(low),
             "volume": int(volume),
         }
         response = app.response_class(
