@@ -106,6 +106,7 @@ def question_replies():
 def filter_image():
     image_url = request.args.get('image_url', 'None')
     new_filter = request.args.get('new_filter', 'None')
+    text = request.args.get('text', 'None')
     if new_filter == 'None':
         response = app.response_class(
             response=json.dumps({'url': image_url}),
@@ -151,7 +152,17 @@ def filter_image():
             max_tokens=300,
         )
         prompt = response.dict()["choices"][0]["message"]["content"]
-        filtered_prompt = f"Reimagine the following prompt if it were filtered like {new_filter}: {prompt}"
+        class AssistClassifier(dspy.Signature):
+            """Given a message from a large language model, determine whether or not it provides information other than being unable to assist with our request."""
+
+            message = dspy.InputField()
+            denied = dspy.OutputField(desc="Y or N based on whether information other than being denied is shared.")
+        assistclass = dspy.Predict(AssistClassifier)
+        assist = assistclass(message=prompt)
+        if assist.denied == "Y":
+            filtered_prompt = f"Reimagine the following prompt if it were filtered like {new_filter}: {text}"
+        else:
+            filtered_prompt = f"Reimagine the following prompt if it were filtered like {new_filter}: {prompt}"
         response = client.images.generate(
             model="dall-e-3",
             prompt=filtered_prompt,
