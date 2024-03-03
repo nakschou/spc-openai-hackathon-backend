@@ -311,3 +311,62 @@ def text_to_finance_data():
     )
     return response
 
+@app.route('text_to_politics', methods=['GET'])
+def text_to_politics():
+    text = request.args.get('text', 'None')
+    response = requests.post(
+        url="https://openrouter.ai/api/v1/chat/completions",
+        headers={
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        },
+        data=json.dumps({
+            "model": "perplexity/sonar-small-chat", # Optional
+            "messages": [
+            {"role": "user", "content": "Give me the top three links to current news articles in a numbered list related to this tweet: " + text \
+                + "make sure to included the title  followed by a colon and then the link to the article"}
+            ]
+        })
+    )
+    data = json.loads(response.text)
+    message_content = data['choices'][0]['message']['content']
+
+    def get_title_link(input_text):
+        class get_title(dspy.Signature):
+            """Given a string with a title in it, give me just the title as a string"""
+            text = dspy.InputField()
+            title = dspy.OutputField(desc="title of article")
+        title = dspy.Predict(get_title)
+        title_out = title(text=input_text).toDict()['title']
+
+        class get_link(dspy.Signature):
+            """Given a string with a link in it, give me just the link as a string"""
+            text = dspy.InputField()
+            link = dspy.OutputField(desc="link to article")
+        link = dspy.Predict(get_link)
+        link_out = link(text=input_text).toDict()['link']
+
+        return {"title": title_out, "link": link_out}
+
+    class format_output(dspy.Signature):
+        """Given a string of articles, give me the title and link of each article"""
+        text = dspy.InputField()
+        formatted = dspy.OutputField(desc="title of article and link to article")
+    formatted = dspy.Predict(format_output)
+    answer = formatted(text=message_content)
+    answer = answer.toDict()['formatted']
+    lines = answer.split('\n')
+
+    articles = []
+
+    for line in lines:
+        articles.append(get_title_link(line))
+
+    class classify_party(dspy.Signature):
+        """Given tweet text, classify the political party of the author"""
+        text = dspy.InputField()
+        party = dspy.OutputField(desc="Right, Left, or Center")
+    party_output = dspy.Predict(classify_party)
+    party = party_output(text=text).toDict()['party']
+    
+    
+    return {"party": party, "articles": articles}
