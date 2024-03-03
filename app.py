@@ -327,7 +327,7 @@ def text_to_politics():
             "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         },
         data=json.dumps({
-            "model": "perplexity/sonar-small-chat", # Optional
+            "model": "perplexity/sonar-small-online", # Optional
             "messages": [
             {"role": "user", "content": "Give me the top three links to current news articles in a numbered list related to this tweet: " + text \
                 + "make sure to included the title  followed by a colon and then the link to the article"}
