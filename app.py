@@ -39,13 +39,6 @@ def question_replies():
     try:
         answer = q_3(question=text, adjective=adjective)
         answer = answer.toDict()
-        response = app.response_class(
-            response=json.dumps(answer),
-            status=200,
-            mimetype='application/json'
-        )
-        response.headers.add('Access-Control-Allow-Origin', '*')
-        return response
     except Exception as e:
         response = app.response_class(
             response=json.dumps({'error': str(e)}),
@@ -54,6 +47,83 @@ def question_replies():
         )
         response.headers.add('Access-Control-Allow-Origin', '*')
         return response
+    class Controversial(dspy.Signature):
+        """Given a tweet, determine whether it is controversial or not."""
+
+        tweet = dspy.InputField()
+        controversial = dspy.OutputField(desc="Y or N")
+    contro = dspy.Predict(Controversial)
+    try:
+        cont = contro(tweet=text)
+    except Exception as e:
+        response = app.response_class(
+            response=json.dumps({'error': str(e)}),
+            status=500,
+            mimetype='application/json'
+        )
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        return response
+    if cont.controversial == "Y":
+        try:
+            response = requests.post(
+                url="https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                },
+                data=json.dumps({
+                    "model": "perplexity/sonar-small-online", # Optional
+                    "messages": [
+                    {"role": "user", "content": "Give me the one top link to a news article that disproves the following tweet: " + "The insurrection was a peaceful protest."}
+                    ]
+                })
+            )
+        except Exception as e:
+            response = app.response_class(
+                response=json.dumps({'error': str(e)}),
+                status=500,
+                mimetype='application/json'
+            )
+            response.headers.add('Access-Control-Allow-Origin', '*')
+            return response
+        class CommunityNote(dspy.Signature):
+            """Given a tweet and an explanation of why it is incorrect, generate a correction of the base statement without referring to oneself or the other user. Humor is a plus."""
+
+            tweet = dspy.InputField()
+            explanation = dspy.InputField(desc="Explanation of why the base statement is incorrect")
+            correction = dspy.OutputField(desc="Informative correction of the base statement and mildly humorous if possible. Cite sources.")
+        cn = dspy.Predict(CommunityNote)
+        try:
+            cn_ret = cn(tweet=text, explanation = response.json()["choices"][0]["message"]["content"])
+            response = app.response_class(
+                response=json.dumps({'reply1': answer.reply1, 
+                                        'reply2': answer.reply2,
+                                        'reply3': answer.reply3,
+                                    'community_note': cn_ret.correction}),
+                status=200,
+                mimetype='application/json'
+            )
+            response.headers.add('Access-Control-Allow-Origin', '*')
+            return response
+        except Exception as e:
+            response = app.response_class(
+                response=json.dumps({'error': str(e)}),
+                status=500,
+                mimetype='application/json'
+            )
+            response.headers.add('Access-Control-Allow-Origin', '*')
+            return response
+    else:
+        response = app.response_class(
+            response=json.dumps({'reply1': answer.reply1, 
+                                    'reply2': answer.reply2,
+                                    'reply3': answer.reply3,
+                                    'community_note': "None"}),
+            status=200,
+            mimetype='application/json'
+        )
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        return response
+        
     
 @app.route('/filter_image', methods=['GET'])
 def filter_image():
@@ -323,24 +393,8 @@ def text_to_weather():
 
 @app.route('/text_to_finance_data', methods=['GET'])
 def text_to_finance_data():
-    text = request.args.get('text', 'None')
-    class Ticker_Finder(dspy.Signature):
-        """Given a tweet, derive a stock ticker from the tweet"""
-
-        tweet = dspy.InputField()
-        ticker = dspy.OutputField(desc="Ticker such as 'AAPL' or 'GOOGL', or 'None' if no ticker found.")
-    tck = dspy.Predict(Ticker_Finder)
-    try:
-        answer = tck(tweet=text)
-    except Exception as e:
-        response = app.response_class(
-            response=json.dumps({'error': "Error in deriving ticker from text"}),
-            status=500,
-            mimetype='application/json'
-        )
-        response.headers.add('Access-Control-Allow-Origin', '*')
-        return response
-    if answer.ticker == "None":
+    ticker = request.args.get('ticker', 'None')
+    if ticker == "None":
         response = app.response_class(
             response=json.dumps({'error': "No ticker found"}),
             status=500,
@@ -349,7 +403,7 @@ def text_to_finance_data():
         response.headers.add('Access-Control-Allow-Origin', '*')
         return response
     try:
-        data = yf.download(answer.ticker, period="1mo")
+        data = yf.download(ticker, period="1mo")
     except Exception as e:
         response = app.response_class(
             response=json.dumps({'error': "Error in fetching finance data"}),
@@ -367,7 +421,7 @@ def text_to_finance_data():
     volume = data["Volume"][-1]
     close_prices = {timestamp.to_pydatetime().isoformat() + 'Z': price for timestamp, price in close_prices.items()}
     returnjson = {
-        "ticker": answer.ticker,
+        "ticker": ticker,
         "percent_today": percent_today,
         "amount_today": amount_today,
         "current_price": current_price,
