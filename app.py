@@ -99,7 +99,7 @@ def filter_image():
                 {
                 "role": "assistant",
                 "content": [
-                    {"type": "text", "text": f"Briefly describe the contents of the image."},
+                    {"type": "text", "text": f"Briefly describe the contents of the image. Two sentences max."},
                     {
                     "type": "image_url",
                     "image_url": {
