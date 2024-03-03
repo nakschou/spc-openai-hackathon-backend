@@ -316,3 +316,4 @@ def text_to_finance_data():
         mimetype='application/json'
     )
     return response
+
