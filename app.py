@@ -76,9 +76,9 @@ def filter_image():
     try:
         if r.exists(image_url+new_filter):
             print("Here")
-            print(r.get(image_url+new_filter))
+            the_image = str(r.get(image_url+new_filter))
             response = app.response_class(
-                response=json.dumps({'image': r.get(image_url+new_filter)}),
+                response=json.dumps({'image': the_image}),
                 status=200,
                 mimetype='application/json'
             )
@@ -140,6 +140,7 @@ def filter_image():
         image.save(compressed_image_io, format='JPEG', quality=20)
         compressed_image_io.seek(0)  # Rewind the file-like object to its beginning
         image_base64 = base64.b64encode(compressed_image_io.read()).decode('utf-8')
+        print(type(image_base64))
         r.set(image_url+new_filter, image_base64)
         response = app.response_class(
             response=json.dumps({'image': image_base64}),
