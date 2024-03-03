@@ -346,6 +346,15 @@ def get_clothing_items():
         )
         response.headers.add('Access-Control-Allow-Origin', '*')
         return response
+    elif r.exists(url):
+        items = r.get(url)
+        response = app.response_class(
+            response=items,
+            status=200,
+            mimetype='application/json'
+        )
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        return response
     
     def get_link(url):
         items = get_image_description(url)
@@ -479,6 +488,7 @@ def get_clothing_items():
                 status=200,
                 mimetype='application/json'
             )
+            r.set(url, json.dumps(items))
             response.headers.add('Access-Control-Allow-Origin', '*')
             return response
         except Exception as e:
