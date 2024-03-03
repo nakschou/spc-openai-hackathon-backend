@@ -6,6 +6,11 @@ from openai import OpenAI
 import requests
 import urllib.parse
 import yfinance as yf
+import redis
+from PIL import Image
+from io import BytesIO
+import base64
+import redis
 
 app = Flask(__name__)
 client = OpenAI()
@@ -16,6 +21,7 @@ OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 turbo = dspy.OpenAI(model='gpt-4', api_key=OPENAI_API_KEY)
 dspy.configure(lm=turbo)
+r = redis.from_url(os.environ['REDIS_URL'])
 
 @app.route('/question_replies', methods=['GET'])
 def question_replies():
@@ -67,6 +73,14 @@ def filter_image():
         )
         response.headers.add('Access-Control-Allow-Origin', '*')
         return response
+    if r.exists(image_url+new_filter):
+        response = app.response_class(
+            response=json.dumps({'image': r.get(image_url+new_filter)}),
+            status=200,
+            mimetype='application/json'
+        )
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        return response
     try:
         response = client.chat.completions.create(
         model="gpt-4-vision-preview",
@@ -105,8 +119,19 @@ def filter_image():
             n=1,
         )
         url = response.dict()["data"][0]["url"]
+        r.set(image_url+new_filter, url)
+        # Step 1: Download the image
+        response = requests.get(url)
+        response.raise_for_status()  # This will raise an HTTPError if the request returned an unsuccessful status code.
+
+        # Step 2: Compress the image
+        image = Image.open(BytesIO(response.content))
+        compressed_image_io = BytesIO()
+        image.save(compressed_image_io, format='JPEG', quality=20)
+        compressed_image_io.seek(0)  # Rewind the file-like object to its beginning
+        image_base64 = base64.b64encode(compressed_image_io.read()).decode('utf-8')
         response = app.response_class(
-            response=json.dumps({'url': url}),
+            response=json.dumps({'image': image_base64}),
             status=200,
             mimetype='application/json'
         )
