@@ -429,7 +429,7 @@ def text_to_finance_data():
             "close_prices": close_prices,
             "high": high,
             "low": low,
-            "volume": volume,
+            "volume": int(volume),
         }
         response = app.response_class(
             response=json.dumps(returnjson),
