@@ -243,6 +243,7 @@ def text_to_weather():
             "humidity": weather["main"]["humidity"],
             "wind_speed": weather["wind"]["speed"],
             "wind_direction": weather["wind"]["deg"],
+            "icon": weather["weather"][0]["icon"],
         }
         response = app.response_class(
             response=json.dumps(returnjson),
@@ -296,6 +297,9 @@ def text_to_finance_data():
     current_price = data["Close"][-1]
     amount_today = data["Close"][-1] - data["Open"][-1]
     close_prices = data["Close"].to_dict()
+    high = data["High"][-1]
+    low = data["Low"][-1]
+    volume = data["Volume"][-1]
     close_prices = {timestamp.to_pydatetime().isoformat() + 'Z': price for timestamp, price in close_prices.items()}
     returnjson = {
         "ticker": answer.ticker,
@@ -303,6 +307,9 @@ def text_to_finance_data():
         "amount_today": amount_today,
         "current_price": current_price,
         "close_prices": close_prices,
+        "high": high,
+        "low": low,
+        "volume": volume,
     }
     response = app.response_class(
         response=json.dumps(returnjson),
