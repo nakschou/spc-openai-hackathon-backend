@@ -73,10 +73,21 @@ def filter_image():
         )
         response.headers.add('Access-Control-Allow-Origin', '*')
         return response
-    if r.exists(image_url+new_filter):
+    try:
+        if r.exists(image_url+new_filter):
+            print("Here")
+            print(r.get(image_url+new_filter))
+            response = app.response_class(
+                response=json.dumps({'image': r.get(image_url+new_filter)}),
+                status=200,
+                mimetype='application/json'
+            )
+            response.headers.add('Access-Control-Allow-Origin', '*')
+            return response
+    except Exception as e:
         response = app.response_class(
-            response=json.dumps({'image': r.get(image_url+new_filter)}),
-            status=200,
+            response=json.dumps({'error': "Error in fetching image from cache"}),
+            status=500,
             mimetype='application/json'
         )
         response.headers.add('Access-Control-Allow-Origin', '*')
