@@ -520,6 +520,14 @@ def get_clothing_items():
 @app.route('/text_to_politics', methods=['GET'])
 def text_to_politics():
     text = request.args.get('text', 'None')
+    if r.exists(text + ".politics"):
+        response = app.response_class(
+            response=r.get(text + ".politics"),
+            status=200,
+            mimetype='application/json'
+        )
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        return response
     try:
         response = requests.post(
             url="https://openrouter.ai/api/v1/chat/completions",
@@ -574,7 +582,7 @@ def text_to_politics():
             party = dspy.OutputField(desc="Right, Left, or Center")
         party_output = dspy.Predict(classify_party)
         party = party_output(text=text).toDict()['party']
-        
+        r.set(text + ".politics", json.dumps({"party": party, "articles": articles}))
         response = app.response_class(
             response=json.dumps({"party": party, "articles": articles}),
             status=200,
