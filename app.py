@@ -243,6 +243,7 @@ def text_to_weather():
             "humidity": weather["main"]["humidity"],
             "wind_speed": weather["wind"]["speed"],
             "wind_direction": weather["wind"]["deg"],
+            "icon": weather["weather"][0]["icon"],
         }
         response = app.response_class(
             response=json.dumps(returnjson),
