@@ -6,6 +6,11 @@ from openai import OpenAI
 import requests
 import urllib.parse
 import yfinance as yf
+import redis
+from PIL import Image
+from io import BytesIO
+import base64
+import redis
 
 app = Flask(__name__)
 client = OpenAI()
@@ -13,28 +18,33 @@ load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 MAPBOX_API_KEY = os.getenv("MAPBOX_API_KEY")
 OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 turbo = dspy.OpenAI(model='gpt-4', api_key=OPENAI_API_KEY)
 dspy.configure(lm=turbo)
+r = redis.from_url(os.environ['REDIS_URL'])
 
 @app.route('/question_replies', methods=['GET'])
 def question_replies():
     text = request.args.get('text', 'What is the meaning of life?')
+    adjective = request.args.get('adjective', 'None')
     class Question_Three_Replies(dspy.Signature):
-        """Given a tweet with a question, generate three possible unique replies"""
+        """Given a tweet with a question, generate three possible unique replies in the voice of the given adjective."""
 
         question = dspy.InputField()
+        adjective = dspy.InputField(desc="Adjective to describe the replies")
         reply1 = dspy.OutputField(desc="1-5 words")
         reply2 = dspy.OutputField(desc="1-5 words")
         reply3 = dspy.OutputField(desc="1-5 words")
     q_3 = dspy.Predict(Question_Three_Replies)
     try:
-        answer = q_3(question=text)
+        answer = q_3(question=text, adjective=adjective)
         answer = answer.toDict()
         response = app.response_class(
             response=json.dumps(answer),
             status=200,
             mimetype='application/json'
         )
+        response.headers.add('Access-Control-Allow-Origin', '*')
         return response
     except Exception as e:
         response = app.response_class(
@@ -42,6 +52,7 @@ def question_replies():
             status=500,
             mimetype='application/json'
         )
+        response.headers.add('Access-Control-Allow-Origin', '*')
         return response
     
 @app.route('/filter_image', methods=['GET'])
@@ -54,6 +65,7 @@ def filter_image():
             status=200,
             mimetype='application/json'
         )
+        response.headers.add('Access-Control-Allow-Origin', '*')
         return response
     if image_url == 'None':
         response = app.response_class(
@@ -61,6 +73,26 @@ def filter_image():
             status=500,
             mimetype='application/json'
         )
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        return response
+    try:
+        if r.exists(image_url+new_filter):
+            print("Here")
+            the_image = r.get(image_url+new_filter).decode('utf-8')
+            response = app.response_class(
+                response=json.dumps({'image': the_image}),
+                status=200,
+                mimetype='application/json'
+            )
+            response.headers.add('Access-Control-Allow-Origin', '*')
+            return response
+    except Exception as e:
+        response = app.response_class(
+            response=json.dumps({'error': str(e)}),
+            status=500,
+            mimetype='application/json'
+        )
+        response.headers.add('Access-Control-Allow-Origin', '*')
         return response
     try:
         response = client.chat.completions.create(
@@ -69,7 +101,7 @@ def filter_image():
                 {
                 "role": "assistant",
                 "content": [
-                    {"type": "text", "text": f"Briefly describe the contents of the image."},
+                    {"type": "text", "text": f"Briefly describe the contents of the image. Two sentences max."},
                     {
                     "type": "image_url",
                     "image_url": {
@@ -87,6 +119,7 @@ def filter_image():
             status=500,
             mimetype='application/json'
         )
+        response.headers.add('Access-Control-Allow-Origin', '*')
         return response
     prompt = response.dict()["choices"][0]["message"]["content"]
     filtered_prompt = f"Reimagine the following prompt if it were filtered like {new_filter}: {prompt}"
@@ -99,11 +132,24 @@ def filter_image():
             n=1,
         )
         url = response.dict()["data"][0]["url"]
+        # Step 1: Download the image
+        response = requests.get(url)
+        response.raise_for_status()  # This will raise an HTTPError if the request returned an unsuccessful status code.
+
+        # Step 2: Compress the image
+        image = Image.open(BytesIO(response.content))
+        compressed_image_io = BytesIO()
+        image.save(compressed_image_io, format='JPEG', quality=20)
+        compressed_image_io.seek(0)  # Rewind the file-like object to its beginning
+        image_base64 = base64.b64encode(compressed_image_io.read()).decode('utf-8')
+        print(type(image_base64))
+        r.set(image_url+new_filter, image_base64)
         response = app.response_class(
-            response=json.dumps({'url': url}),
+            response=json.dumps({'image': image_base64}),
             status=200,
             mimetype='application/json'
         )
+        response.headers.add('Access-Control-Allow-Origin', '*')
         return response
     except Exception as e:
         response = app.response_class(
@@ -111,6 +157,7 @@ def filter_image():
             status=500,
             mimetype='application/json'
         )
+        response.headers.add('Access-Control-Allow-Origin', '*')
         return response
 
 @app.route('/text_to_image', methods=['GET'])
@@ -123,6 +170,16 @@ def text_to_image():
             status=500,
             mimetype='application/json'
         )
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        return response
+    if r.exists(text+new_filter):
+        the_image = r.get(text+new_filter).decode('utf-8')
+        response = app.response_class(
+            response=json.dumps({'image': the_image}),
+            status=200,
+            mimetype='application/json'
+        )
+        response.headers.add('Access-Control-Allow-Origin', '*')
         return response
     try:
         if new_filter == "None":
@@ -137,11 +194,23 @@ def text_to_image():
             n=1,
         )
         url = response.dict()["data"][0]["url"]
+        # Step 1: Download the image
+        response = requests.get(url)
+        response.raise_for_status()  # This will raise an HTTPError if the request returned an unsuccessful status code.
+
+        # Step 2: Compress the image
+        image = Image.open(BytesIO(response.content))
+        compressed_image_io = BytesIO()
+        image.save(compressed_image_io, format='JPEG', quality=20)
+        compressed_image_io.seek(0)  # Rewind the file-like object to its beginning
+        image_base64 = base64.b64encode(compressed_image_io.read()).decode('utf-8')
+        r.set(text+new_filter, image_base64)
         response = app.response_class(
-            response=json.dumps({'url': url}),
+            response=json.dumps({'image': image_base64}),
             status=200,
             mimetype='application/json'
         )
+        response.headers.add('Access-Control-Allow-Origin', '*')
         return response
     except Exception as e:
         response = app.response_class(
@@ -149,6 +218,7 @@ def text_to_image():
             status=500,
             mimetype='application/json'
         )
+        response.headers.add('Access-Control-Allow-Origin', '*')
         return response
     
 @app.route('/text_to_coords', methods=['GET'])
@@ -160,6 +230,7 @@ def text_to_coords():
             status=500,
             mimetype='application/json'
         )
+        response.headers.add('Access-Control-Allow-Origin', '*')
         return response
     class Address_Finder(dspy.Signature):
         """Given a tweet, derive an address or location from the tweet that could be geocoded"""
@@ -174,6 +245,7 @@ def text_to_coords():
             status=500,
             mimetype='application/json'
         )
+        response.headers.add('Access-Control-Allow-Origin', '*')
         return response
     answer = add(tweet=text)
     try:
@@ -189,6 +261,7 @@ def text_to_coords():
             status=200,
             mimetype='application/json'
         )
+        response.headers.add('Access-Control-Allow-Origin', '*')
         return response
     except Exception as e:
         response = app.response_class(
@@ -196,28 +269,14 @@ def text_to_coords():
             status=500,
             mimetype='application/json'
         )
+        response.headers.add('Access-Control-Allow-Origin', '*')
         return response
     
 @app.route('/text_to_weather', methods=['GET'])
 def text_to_weather():
-    text = request.args.get('text', 'None')
-    class Address_Finder(dspy.Signature):
-        """Given a tweet, derive an address or location from the tweet that could be geocoded"""
-
-        tweet = dspy.InputField()
-        location = dspy.OutputField(desc="Address or location, or 'None' if no location found.")
-    add = dspy.Predict(Address_Finder)
+    location = request.args.get('location', 'None')
     try:
-        answer = add(tweet=text)
-    except Exception as e:
-        response = app.response_class(
-            response=json.dumps({'error': "Error in deriving location from text"}),
-            status=500,
-            mimetype='application/json'
-        )
-        return response
-    try:
-        encoded_location = urllib.parse.quote(answer.location, safe='')
+        encoded_location = urllib.parse.quote(location, safe='')
         url = f"https://api.mapbox.com/geocoding/v5/mapbox.places/{encoded_location}.json"
         params = {
             "access_token": MAPBOX_API_KEY,
@@ -230,6 +289,7 @@ def text_to_weather():
             status=500,
             mimetype='application/json'
         )
+        response.headers.add('Access-Control-Allow-Origin', '*')
         return response
     try:
         url = f"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={OPENWEATHER_API_KEY}&units=imperial"
@@ -243,13 +303,14 @@ def text_to_weather():
             "humidity": weather["main"]["humidity"],
             "wind_speed": weather["wind"]["speed"],
             "wind_direction": weather["wind"]["deg"],
-            "icon": weather["weather"][0]["icon"],
+            "icon": f"https://openweathermap.org/img/wn/{weather["weather"][0]["icon"]}@2x.png",
         }
         response = app.response_class(
             response=json.dumps(returnjson),
             status=200,
             mimetype='application/json'
         )
+        response.headers.add('Access-Control-Allow-Origin', '*')
         return response
     except Exception as e:
         response = app.response_class(
@@ -257,6 +318,7 @@ def text_to_weather():
             status=500,
             mimetype='application/json'
         )
+        response.headers.add('Access-Control-Allow-Origin', '*')
         return response
 
 @app.route('/text_to_finance_data', methods=['GET'])
@@ -276,6 +338,7 @@ def text_to_finance_data():
             status=500,
             mimetype='application/json'
         )
+        response.headers.add('Access-Control-Allow-Origin', '*')
         return response
     if answer.ticker == "None":
         response = app.response_class(
@@ -283,6 +346,7 @@ def text_to_finance_data():
             status=500,
             mimetype='application/json'
         )
+        response.headers.add('Access-Control-Allow-Origin', '*')
         return response
     try:
         data = yf.download(answer.ticker, period="1mo")
@@ -292,6 +356,7 @@ def text_to_finance_data():
             status=500,
             mimetype='application/json'
         )
+        response.headers.add('Access-Control-Allow-Origin', '*')
         return response
     percent_today = (data["Close"][-1] - data["Open"][-1]) / data["Open"][-1] * 100
     current_price = data["Close"][-1]
@@ -316,6 +381,7 @@ def text_to_finance_data():
         status=200,
         mimetype='application/json'
     )
+    response.headers.add('Access-Control-Allow-Origin', '*')
     return response
 
 @app.route('/text_to_politics', methods=['GET'])
@@ -375,5 +441,10 @@ def text_to_politics():
     party_output = dspy.Predict(classify_party)
     party = party_output(text=text).toDict()['party']
     
-    
-    return {"party": party, "articles": articles}
+    response = app.response_class(
+        response=json.dumps({"party": party, "articles": articles}),
+        status=200,
+        mimetype='application/json'
+    )
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    return response
