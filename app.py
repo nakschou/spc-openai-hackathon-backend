@@ -172,6 +172,15 @@ def text_to_image():
         )
         response.headers.add('Access-Control-Allow-Origin', '*')
         return response
+    if r.exists(text+new_filter):
+        the_image = r.get(text+new_filter).decode('utf-8')
+        response = app.response_class(
+            response=json.dumps({'image': the_image}),
+            status=200,
+            mimetype='application/json'
+        )
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        return response
     try:
         if new_filter == "None":
             prompt = "Convert the following text prompt to an image: " + text
@@ -185,8 +194,19 @@ def text_to_image():
             n=1,
         )
         url = response.dict()["data"][0]["url"]
+        # Step 1: Download the image
+        response = requests.get(url)
+        response.raise_for_status()  # This will raise an HTTPError if the request returned an unsuccessful status code.
+
+        # Step 2: Compress the image
+        image = Image.open(BytesIO(response.content))
+        compressed_image_io = BytesIO()
+        image.save(compressed_image_io, format='JPEG', quality=20)
+        compressed_image_io.seek(0)  # Rewind the file-like object to its beginning
+        image_base64 = base64.b64encode(compressed_image_io.read()).decode('utf-8')
+        r.set(text+new_filter, image_base64)
         response = app.response_class(
-            response=json.dumps({'url': url}),
+            response=json.dumps({'image': image_base64}),
             status=200,
             mimetype='application/json'
         )
