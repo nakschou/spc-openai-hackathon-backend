@@ -318,7 +318,7 @@ def text_to_finance_data():
     )
     return response
 
-@app.route('text_to_politics', methods=['GET'])
+@app.route('/text_to_politics', methods=['GET'])
 def text_to_politics():
     text = request.args.get('text', 'None')
     response = requests.post(
