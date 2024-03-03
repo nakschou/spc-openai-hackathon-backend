@@ -19,9 +19,12 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 MAPBOX_API_KEY = os.getenv("MAPBOX_API_KEY")
 OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 turbo = dspy.OpenAI(model='gpt-4', api_key=OPENAI_API_KEY)
 dspy.configure(lm=turbo)
 r = redis.from_url(os.environ['REDIS_URL'])
+pc = Pinecone(api_key=PINECONE_API_KEY)
+index = pc.Index("spchack")
 
 @app.route('/question_replies', methods=['GET'])
 def question_replies():
@@ -330,6 +333,167 @@ def text_to_finance_data():
         )
         response.headers.add('Access-Control-Allow-Origin', '*')
         return response
+
+@app.route('/get_clothing', methods=['GET'])
+def get_clothing_items():
+    url = request.args.get('url', 'None')
+    if url == "None":
+        response = app.response_class(
+            response=json.dumps({'error': "No url found"}),
+            status=500,
+            mimetype='application/json'
+        )
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        return response
+    
+    def get_link(url):
+        items = get_image_description(url)
+        items = strip_newlines(items)
+
+        #for each item in the items, check how many items there are in the value
+        parsed_items = process_json(items)
+        return parsed_items
+
+
+    def get_image_description(url):
+        response = client.chat.completions.create(
+        model="gpt-4-vision-preview",
+        messages=[
+            {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "What are all of the articles of clothing in this image? Format the response in JSON object format, \
+                with the following categories as keys: 'pants, shorts, hats, shirts, tshirts, shoes, jackets'. For each entry in any of the \
+                    categories, make sure to include a two sentence description including things like the color, material used, and any other relevant details."},
+                {
+                "type": "image_url",
+                "image_url": {
+                    "url": url,
+                },
+                },
+            ],
+            }
+        ],
+        max_tokens=300,
+        )
+
+        return response.choices[0].message.content
+
+
+    def process_json(json_object):
+        for key, value in json_object.items():
+            if isinstance(value, list):
+                for item in value:
+                    # Assuming each item in the list has a 'description' key
+                    if isinstance(item, dict) and 'description' in item:
+                        item['description'] = embed_text(item['description'])
+                    elif isinstance(item, str):
+                        # If the list contains strings, embed those
+                        value[value.index(item)] = embed_text(item)
+            elif isinstance(value, dict):
+                # Recursively process nested dictionaries
+                json_object[key] = process_json(value)
+            elif isinstance(value, str):
+                # Embed the string value
+                json_object[key] = embed_text(value)
+        
+        return json_object
+
+
+    def strip_newlines(desc):
+        try:
+            desc = desc.replace('\n', '')
+            desc = desc.replace('`', '')
+            desc = desc.replace('json', '')
+            desc = json.loads(desc)
+            return desc
+        except:
+            return 'Error stripping newlines'
+
+    def embed_text(text, model="text-embedding-3-small"):
+        text = text.replace("\n", " ")
+        return client.embeddings.create(input = [text], model=model).data[0].embedding
+
+    def item_query(vector, item):
+        pc = Pinecone(api_key=PINECONE_API_KEY)
+        index = pc.Index("spchack")
+        match = index.query(
+            vector=vector,
+            filter={
+                "item_type": {"$eq": item},
+            },
+            top_k=1,
+            include_metadata=True
+        )
+        return match
+
+    def replace_vectors_with_search_results(json_object):
+        for key, value in json_object.items():
+            if isinstance(value, list):
+                for item in value:
+                    # Assuming each item in the list has a 'description' key
+                    if isinstance(item, dict) and 'description' in item:
+                        # Call vector search function and replace the vector with the result
+                        item['description'] = item_query(item['description'], key)
+            elif isinstance(value, dict):
+                # Recursively process nested dictionaries
+                json_object[key] = replace_vectors_with_search_results(value)
+        
+        return json_object
+
+    def extract_clothing_info(input_data):
+        result = {}
+
+        for category, items in input_data.items():
+            category_info = []
+
+            for item in items:
+                description = item.get('description', {})
+                matches = description.get('matches', [])
+
+                for match in matches:
+                    metadata = match.get('metadata', {})
+                    article_info = {
+                        'img_src': metadata.get('img_src', ''),
+                        'item_link': metadata.get('item_link', ''),
+                        'description': metadata.get('description', ''),
+                        'item_type': metadata.get('item_type', ''),
+                    }
+
+                    category_info.append(article_info)
+
+            result[category] = category_info
+
+        return result
+    
+    error = ""
+    attempts = 0
+    while attempts < 2:
+        try:
+            items = get_link(url)
+            items = replace_vectors_with_search_results(items)
+            items = extract_clothing_info(items)
+            response = app.response_class(
+                response=json.dumps(items),
+                status=200,
+                mimetype='application/json'
+            )
+            response.headers.add('Access-Control-Allow-Origin', '*')
+            return response
+        except Exception as e:
+            error = str(e)
+            attempts += 1
+
+    response = app.response_class(
+            response=json.dumps({'error': error}),
+            status=500,
+            mimetype='application/json'
+        )
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    return response
+
+
+
 
 @app.route('/text_to_politics', methods=['GET'])
 def text_to_politics():
