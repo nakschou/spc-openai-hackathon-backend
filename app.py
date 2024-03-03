@@ -86,7 +86,7 @@ def filter_image():
             return response
     except Exception as e:
         response = app.response_class(
-            response=json.dumps({'error': "Error in fetching image from cache"}),
+            response=json.dumps({'error': str(e)}),
             status=500,
             mimetype='application/json'
         )
