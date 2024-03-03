@@ -76,7 +76,7 @@ def filter_image():
     try:
         if r.exists(image_url+new_filter):
             print("Here")
-            the_image = str(r.get(image_url+new_filter))
+            the_image = r.get(image_url+new_filter).decode('utf-8')
             response = app.response_class(
                 response=json.dumps({'image': the_image}),
                 status=200,
