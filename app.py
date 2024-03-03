@@ -55,6 +55,7 @@ def filter_image():
             status=200,
             mimetype='application/json'
         )
+        response.headers.add('Access-Control-Allow-Origin', '*')
         return response
     if image_url == 'None':
         response = app.response_class(
@@ -62,6 +63,7 @@ def filter_image():
             status=500,
             mimetype='application/json'
         )
+        response.headers.add('Access-Control-Allow-Origin', '*')
         return response
     try:
         response = client.chat.completions.create(
@@ -88,6 +90,7 @@ def filter_image():
             status=500,
             mimetype='application/json'
         )
+        response.headers.add('Access-Control-Allow-Origin', '*')
         return response
     prompt = response.dict()["choices"][0]["message"]["content"]
     filtered_prompt = f"Reimagine the following prompt if it were filtered like {new_filter}: {prompt}"
@@ -105,6 +108,7 @@ def filter_image():
             status=200,
             mimetype='application/json'
         )
+        response.headers.add('Access-Control-Allow-Origin', '*')
         return response
     except Exception as e:
         response = app.response_class(
@@ -112,6 +116,7 @@ def filter_image():
             status=500,
             mimetype='application/json'
         )
+        response.headers.add('Access-Control-Allow-Origin', '*')
         return response
 
 @app.route('/text_to_image', methods=['GET'])
