@@ -25,46 +25,28 @@ r = redis.from_url(os.environ['REDIS_URL'])
 
 @app.route('/question_replies', methods=['GET'])
 def question_replies():
-    text = request.args.get('text', 'What is the meaning of life?')
-    adjective = request.args.get('adjective', 'None')
-    class Question_Three_Replies(dspy.Signature):
-        """Given a tweet with a question, generate three possible unique replies in the voice of the given adjective."""
-
-        question = dspy.InputField()
-        adjective = dspy.InputField(desc="Adjective to describe the replies")
-        reply1 = dspy.OutputField(desc="1-5 words")
-        reply2 = dspy.OutputField(desc="1-5 words")
-        reply3 = dspy.OutputField(desc="1-5 words")
-    q_3 = dspy.Predict(Question_Three_Replies)
     try:
+        text = request.args.get('text', 'What is the meaning of life?')
+        adjective = request.args.get('adjective', 'None')
+        class Question_Three_Replies(dspy.Signature):
+            """Given a tweet with a question, generate three possible unique replies in the voice of the given adjective."""
+
+            question = dspy.InputField()
+            adjective = dspy.InputField(desc="Adjective to describe the replies")
+            reply1 = dspy.OutputField(desc="1-5 words")
+            reply2 = dspy.OutputField(desc="1-5 words")
+            reply3 = dspy.OutputField(desc="1-5 words")
+        q_3 = dspy.Predict(Question_Three_Replies)
         answer = q_3(question=text, adjective=adjective)
         answer = answer.toDict()
-    except Exception as e:
-        response = app.response_class(
-            response=json.dumps({'error': str(e)}),
-            status=500,
-            mimetype='application/json'
-        )
-        response.headers.add('Access-Control-Allow-Origin', '*')
-        return response
-    class Controversial(dspy.Signature):
-        """Given a tweet, determine whether it is controversial or not."""
+        class Controversial(dspy.Signature):
+            """Given a tweet, determine whether it is controversial or not."""
 
-        tweet = dspy.InputField()
-        controversial = dspy.OutputField(desc="Y or N")
-    contro = dspy.Predict(Controversial)
-    try:
+            tweet = dspy.InputField()
+            controversial = dspy.OutputField(desc="Y or N")
+        contro = dspy.Predict(Controversial)
         cont = contro(tweet=text)
-    except Exception as e:
-        response = app.response_class(
-            response=json.dumps({'error': str(e)}),
-            status=500,
-            mimetype='application/json'
-        )
-        response.headers.add('Access-Control-Allow-Origin', '*')
-        return response
-    if cont.controversial == "Y":
-        try:
+        if cont.controversial == "Y":
             response = requests.post(
                 url="https://openrouter.ai/api/v1/chat/completions",
                 headers={
@@ -77,22 +59,13 @@ def question_replies():
                     ]
                 })
             )
-        except Exception as e:
-            response = app.response_class(
-                response=json.dumps({'error': str(e)}),
-                status=500,
-                mimetype='application/json'
-            )
-            response.headers.add('Access-Control-Allow-Origin', '*')
-            return response
-        class CommunityNote(dspy.Signature):
-            """Given a tweet and an explanation of why it is incorrect, generate a correction of the base statement without referring to oneself or the other user. Humor is a plus."""
+            class CommunityNote(dspy.Signature):
+                """Given a tweet and an explanation of why it is incorrect, generate a correction of the base statement without referring to oneself or the other user. Humor is a plus."""
 
-            tweet = dspy.InputField()
-            explanation = dspy.InputField(desc="Explanation of why the base statement is incorrect")
-            correction = dspy.OutputField(desc="Informative correction of the base statement and mildly humorous if possible. Cite sources.")
-        cn = dspy.Predict(CommunityNote)
-        try:
+                tweet = dspy.InputField()
+                explanation = dspy.InputField(desc="Explanation of why the base statement is incorrect")
+                correction = dspy.OutputField(desc="Informative correction of the base statement and mildly humorous if possible. Cite sources.")
+            cn = dspy.Predict(CommunityNote)
             cn_ret = cn(tweet=text, explanation = response.json()["choices"][0]["message"]["content"])
             response = app.response_class(
                 response=json.dumps({'reply1': answer["reply1"], 
@@ -104,21 +77,21 @@ def question_replies():
             )
             response.headers.add('Access-Control-Allow-Origin', '*')
             return response
-        except Exception as e:
+        else:
             response = app.response_class(
-                response=json.dumps({'error': str(e)}),
-                status=500,
+                response=json.dumps({'reply1': answer["reply1"], 
+                                    'reply2': answer["reply2"],
+                                    'reply3': answer["reply3"],
+                                        'community_note': "None"}),
+                status=200,
                 mimetype='application/json'
             )
             response.headers.add('Access-Control-Allow-Origin', '*')
             return response
-    else:
+    except Exception as e:
         response = app.response_class(
-            response=json.dumps({'reply1': answer["reply1"], 
-                                'reply2': answer["reply2"],
-                                'reply3': answer["reply3"],
-                                    'community_note': "None"}),
-            status=200,
+            response=json.dumps({'error': str(e)}),
+            status=500,
             mimetype='application/json'
         )
         response.headers.add('Access-Control-Allow-Origin', '*')
@@ -147,7 +120,6 @@ def filter_image():
         return response
     try:
         if r.exists(image_url+new_filter):
-            print("Here")
             the_image = r.get(image_url+new_filter).decode('utf-8')
             response = app.response_class(
                 response=json.dumps({'image': the_image}),
@@ -156,15 +128,6 @@ def filter_image():
             )
             response.headers.add('Access-Control-Allow-Origin', '*')
             return response
-    except Exception as e:
-        response = app.response_class(
-            response=json.dumps({'error': str(e)}),
-            status=500,
-            mimetype='application/json'
-        )
-        response.headers.add('Access-Control-Allow-Origin', '*')
-        return response
-    try:
         response = client.chat.completions.create(
         model="gpt-4-vision-preview",
             messages=[
@@ -183,17 +146,8 @@ def filter_image():
             ],
             max_tokens=300,
         )
-    except Exception as e:
-        response = app.response_class(
-            response=json.dumps({'error': "Error in converting from image to URL"}),
-            status=500,
-            mimetype='application/json'
-        )
-        response.headers.add('Access-Control-Allow-Origin', '*')
-        return response
-    prompt = response.dict()["choices"][0]["message"]["content"]
-    filtered_prompt = f"Reimagine the following prompt if it were filtered like {new_filter}: {prompt}"
-    try:
+        prompt = response.dict()["choices"][0]["message"]["content"]
+        filtered_prompt = f"Reimagine the following prompt if it were filtered like {new_filter}: {prompt}"
         response = client.images.generate(
             model="dall-e-3",
             prompt=filtered_prompt,
@@ -212,7 +166,6 @@ def filter_image():
         image.save(compressed_image_io, format='JPEG', quality=20)
         compressed_image_io.seek(0)  # Rewind the file-like object to its beginning
         image_base64 = base64.b64encode(compressed_image_io.read()).decode('utf-8')
-        print(type(image_base64))
         r.set(image_url+new_filter, image_base64)
         response = app.response_class(
             response=json.dumps({'image': image_base64}),
