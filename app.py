@@ -312,6 +312,14 @@ def text_to_finance_data():
         return response
     try:
         data = yf.download(ticker, period="1mo")
+        if data.empty:
+            response = app.response_class(
+                response=json.dumps({'error': "No data found for ticker: " + ticker}),
+                status=500,
+                mimetype='application/json'
+            )
+            response.headers.add('Access-Control-Allow-Origin', '*')
+            return response
         percent_today = (data["Close"][-1] - data["Open"][-1]) / data["Open"][-1] * 100
         current_price = data["Close"][-1]
         amount_today = data["Close"][-1] - data["Open"][-1]
