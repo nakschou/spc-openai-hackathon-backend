@@ -26,16 +26,18 @@ r = redis.from_url(os.environ['REDIS_URL'])
 @app.route('/question_replies', methods=['GET'])
 def question_replies():
     text = request.args.get('text', 'What is the meaning of life?')
+    adjective = request.args.get('adjective', 'None')
     class Question_Three_Replies(dspy.Signature):
-        """Given a tweet with a question, generate three possible unique replies"""
+        """Given a tweet with a question, generate three possible unique replies in the voice of the given adjective."""
 
         question = dspy.InputField()
+        adjective = dspy.InputField(desc="Adjective to describe the replies")
         reply1 = dspy.OutputField(desc="1-5 words")
         reply2 = dspy.OutputField(desc="1-5 words")
         reply3 = dspy.OutputField(desc="1-5 words")
     q_3 = dspy.Predict(Question_Three_Replies)
     try:
-        answer = q_3(question=text)
+        answer = q_3(question=text, adjective=adjective)
         answer = answer.toDict()
         response = app.response_class(
             response=json.dumps(answer),
